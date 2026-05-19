@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Watchlist</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #0f0f0f;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 24px;
+    }
+
+    .add-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    input {
+      flex: 1;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 1rem;
+      padding: 10px 14px;
+      text-transform: uppercase;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #4f8ef7;
+    }
+
+    button {
+      background: #4f8ef7;
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 10px 18px;
+    }
+
+    button:hover {
+      background: #3a7ae0;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #222;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-left .symbol {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .card-left .change {
+      font-size: 0.85rem;
+      margin-top: 2px;
+    }
+
+    .card-right {
+      text-align: right;
+    }
+
+    .card-right .price {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    .card-right .remove {
+      background: transparent;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #888;
+      cursor: pointer;
+      font-size: 0.75rem;
+      margin-top: 6px;
+      padding: 3px 8px;
+    }
+
+    .card-right .remove:hover {
+      border-color: #e05252;
+      color: #e05252;
+    }
+
+    .green { color: #4caf7d; }
+    .red   { color: #e05252; }
+
+    .empty {
+      text-align: center;
+      color: #444;
+      margin-top: 60px;
+      font-size: 0.95rem;
+    }
+
+    .refresh-bar {
+      text-align: center;
+      color: #444;
+      font-size: 0.78rem;
+      margin-bottom: 16px;
+    }
+
+    .error-msg {
+      background: #2a1a1a;
+      border: 1px solid #e05252;
+      border-radius: 8px;
+      color: #e05252;
+      font-size: 0.85rem;
+      margin-bottom: 12px;
+      padding: 10px 14px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Stock Watchlist</h1>
+  <p class="subtitle">Prices refresh every 30 seconds</p>
+
+  <div class="add-row">
+    <input id="symbolInput" type="text" placeholder="Enter symbol (e.g. AAPL)" maxlength="10" />
+    <button onclick="addStock()">Add</button>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+  <div class="refresh-bar" id="refreshBar"></div>
+  <div id="stockList"></div>
+
+  <script>
+    const API = "";  // empty = same server
+
+    async function addStock() {
+      const input = document.getElementById("symbolInput");
+      const symbol = input.value.trim().toUpperCase();
+      if (!symbol) return;
+
+      const res = await fetch(`${API}/api/stocks/${symbol}`, { method: "POST" });
+      if (res.ok) {
+        input.value = "";
+        showError("");
+        loadStocks();
+      } else {
+        showError("Could not add stock. Check the symbol and try again.");
+      }
+    }
+
+    async function removeStock(symbol) {
+      await fetch(`${API}/api/stocks/${symbol}`, { method: "DELETE" });
+      loadStocks();
+    }
+
+    async function loadStocks() {
+      const res = await fetch(`${API}/api/stocks`);
+      const stocks = await res.json();
+
+      const list = document.getElementById("stockList");
+      const bar = document.getElementById("refreshBar");
+
+      bar.textContent = "Last updated: " + new Date().toLocaleTimeString();
+
+      if (stocks.length === 0) {
+        list.innerHTML = '<p class="empty">No stocks yet — add one above!</p>';
+        return;
+      }
+
+      list.innerHTML = stocks.map(s => {
+        const sign = s.change >= 0 ? "+" : "";
+        const cls  = s.change >= 0 ? "green" : "red";
+        return `
+          <div class="card">
+            <div class="card-left">
+              <div class="symbol">${s.symbol}</div>
+              <div class="change ${cls}">${sign}${s.change.toFixed(2)} (${sign}${s.percentChange.toFixed(2)}%)</div>
+            </div>
+            <div class="card-right">
+              <div class="price">$${s.price.toFixed(2)}</div>
+              <button class="remove" onclick="removeStock('${s.symbol}')">Remove</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function showError(msg) {
+      const el = document.getElementById("errorMsg");
+      el.textContent = msg;
+      el.style.display = msg ? "block" : "none";
+    }
+
+    // Press Enter to add a stock
+    document.getElementById("symbolInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") addStock();
+    });
+
+    // Load on startup, then refresh every 30 seconds
+    loadStocks();
+    setInterval(loadStocks, 30000);
+  </script>
+
+</body>
+</html>
