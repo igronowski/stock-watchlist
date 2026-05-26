@@ -59,6 +59,23 @@ public class WatchlistApp {
     //   DELETE → extract the symbol from the URL, remove it from the symbols list
     //   anything else → send a 405 "Method not allowed" response
     private void handleStocks(HttpExchange exchange) throws IOException {
+        String method = exchange.getRequestMethod();
+        if(method.equals("GET")){
+            handleGetStocks(exchange);
+        }else if(method.equals("POST")){
+            String object = exchange.getRequestURI().getPath();
+            String symbol = object.split("/")[2];
+            if(!stockSymbols.contains(symbol)){
+                stockSymbols.add(symbol);
+            }
+        }else if(method.equals("DELETE") ){
+            String object = exchange.getRequestURI().getPath();
+            String symbol = object.split("/")[2];
+            stockSymbols.remove(symbol);
+        }else{
+            send(exchange, 405, "text/plain" ,"Method not allowed");
+        }
+
     }
 
     // handleGetStocks(): fetches prices for every symbol and returns them as a JSON array
@@ -71,17 +88,18 @@ public class WatchlistApp {
     private void handleGetStocks(HttpExchange exchange) throws IOException {
         String str = "[";
         for(int i = 0; i < stockSymbols.size(); i++){
-            Stock stock = fetcher.fetchQuote(stockSymbols.get(i));
-            str += stock.toJson();
-            if(i != stockSymbols.size()-1){
-                str += ", "
-            }
             try {
                 Stock stock = fetcher.fetchQuote(stockSymbols.get(i));
+                str += stock.toJson();
+                if(i != stockSymbols.size()-1){
+                    str += ", ";
+                }
             } catch (Exception e) {
                 System.out.println(e.getMessage());
             }
         }
+        str += "]";
+        send(exchange, 200, "application/json", str);
     }
 
     // send(): a helper to write any response back to the browser
